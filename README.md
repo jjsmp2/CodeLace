@@ -10,6 +10,132 @@ CodeLACE is a novel deep learning model designed for the efficient and accurate 
 *   **Specialized Processing:** Utilizes a Mixture of Experts to route different types of code constructs to specialized processing units.
 *   **Multi-Language Support (Conceptual):** Designed to generalize across various programming languages by focusing on underlying code structures and semantics.
 
+
+# CodeLACE Project Run Guide
+
+This guide provides comprehensive instructions on how to set up, install dependencies, and run the CodeLACE project. It covers the necessary environment setup and how to execute key components of the project.
+
+## 1. Project Structure Overview
+
+Based on the files you have uploaded to your GitHub repository, here is the current structure of your CodeLACE project:
+
+```
+codelace-project/
+├── .gitignore            # Specifies intentionally untracked files to ignore
+├── LICENSE               # Project license information
+├── README.md             # Main project README (this guide)
+├── Semantic Source Code Analysis.docx # Document related to semantic analysis
+├── config.py             # Configuration settings for the model and training
+├── evaluation.py         # Scripts for evaluating the model's performance
+├── model.py              # Defines the CodeLACE model architecture
+├── requirements.txt      # Lists all Python dependencies
+├── tokenizer.py          # Handles tokenization and input preparation
+├── trainer.py            # Contains the training loop and logic
+└── utils.py              # Utility functions
+```
+
+## 2. Environment Setup
+
+It is highly recommended to use a virtual environment to manage project dependencies and avoid conflicts with your system-wide Python packages.
+
+### 2.1. Install Python
+
+CodeLACE is developed with Python. Ensure you have Python 3.8 or newer installed. You can check your Python version using:
+
+```bash
+python3 --version
+```
+
+If you don't have Python installed, you can download it from [python.org](https://www.python.org/downloads/) or use a package manager like `conda` or `pyenv`.
+
+### 2.2. Create a Virtual Environment
+
+Navigate to your project's root directory (`codelace-project/`) in your terminal and create a virtual environment:
+
+```bash
+python3 -m venv venv
+```
+
+### 2.3. Activate the Virtual Environment
+
+**On macOS/Linux:**
+
+```bash
+source venv/bin/activate
+```
+
+**On Windows (Command Prompt):**
+
+```bash
+venc\Scripts\activate.bat
+```
+
+**On Windows (PowerShell):**
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+Your terminal prompt should now show `(venv)` indicating that the virtual environment is active.
+
+## 3. Install Dependencies
+
+With your virtual environment activated, install all required Python packages listed in `requirements.txt`:
+
+```bash
+pip install -r requirements.txt
+```
+
+This command will install libraries such as `torch` (or `tensorflow`), `transformers`, `scikit-learn`, `matplotlib`, etc., which are essential for CodeLACE to function.
+
+## 4. Data Preparation (Conceptual)
+
+CodeLACE operates on software requirements or code snippets. You will need to prepare your dataset in a format compatible with the `tokenizer.py` and `trainer.py` scripts. Typically, this involves:
+
+*   **Collecting Data:** Gather your software requirements or code examples.
+*   **Preprocessing:** Clean and format your data as needed.
+*   **Splitting:** Divide your dataset into training, validation, and test sets.
+
+Refer to specific data loading functions within `trainer.py` or `evaluation.py` for expected data formats.
+
+## 5. Running the CodeLACE Project
+
+### 5.1. Training the Model
+
+To train a new CodeLACE model, you typically run the `trainer.py` script. Before running, you might need to adjust parameters in `config.py` such as learning rate, batch size, number of epochs, and paths to your dataset.
+
+```bash
+python trainer.py
+```
+
+During training, you would typically save checkpoints and logs. You might need to create `checkpoints/` and `logs/` directories manually if your scripts expect them.
+
+### 5.2. Evaluating the Model
+
+After training, you can evaluate the model's performance using the `evaluation.py` script. Ensure that the script is configured to load the correct model checkpoint.
+
+```bash
+python evaluation.py
+```
+
+Evaluation results, including metrics and figures, would typically be saved in a `results/` directory. You might need to create this directory manually if your scripts expect it.
+
+## 6. Deactivating the Virtual Environment
+
+When you are done working on the project, you can deactivate the virtual environment:
+
+```bash
+deactivate
+```
+
+This will return your terminal to your system's default Python environment.
+
+---
+
+**Note:** This guide assumes a standard setup. Depending on your operating system and specific Python environment, minor adjustments to commands might be necessary. If you encounter any issues, refer to the documentation of the respective libraries or Python's official documentation.
+
+
+
 ## Language Examples (Conceptual Analysis by CodeLACE)
 
 CodeLACE's strength lies in its ability to analyze and classify code snippets across different languages by understanding their structural and semantic properties. Below are conceptual examples demonstrating how CodeLACE might process and classify code in various languages.
