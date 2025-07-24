@@ -90,7 +90,7 @@ This command will install libraries such as `torch` (or `tensorflow`), `transfor
 
 ## 4. Data Preparation (Conceptual)
 
-CodeLACE operates on software requirements or code snippets. You will need to prepare your dataset in a format compatible with the `tokenizer.py` and `trainer.py` scripts. Typically, this involves:
+CodeLACE operates on code snippets. You will need to prepare your dataset in a format compatible with the `tokenizer.py` and `trainer.py` scripts. Typically, this involves:
 
 *   **Collecting Data:** Gather source code examples.
 *   **Preprocessing:** Clean and format your data as needed.
