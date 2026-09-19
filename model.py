@@ -23,6 +23,68 @@ class SparseAttention(nn.Module):
         self.key = nn.Linear(config.hidden_size, config.hidden_size)
         self.value = nn.Linear(config.hidden_size, config.hidden_size)
         self.dropout = nn.Dropout(config.dropout_prob)
+
+class CodeLACELayer(nn.Module):
+    def __init__(self, config: CodeLACEConfig):
+        super().__init__()
+
+        # Attention: sparse or standard full attention
+        if config.use_sparse_attention:
+            self.attention = SparseAttention(config)
+        else:
+            self.attention = nn.MultiheadAttention(
+                embed_dim=config.hidden_size,
+                num_heads=config.num_heads,
+                dropout=config.dropout_prob,
+                batch_first=True
+            )
+
+        # FFN: MoE or standard FFN
+        if config.use_moe:
+            self.ffn = MixtureOfExperts(config)
+        else:
+            self.ffn = nn.Sequential(
+                nn.Linear(config.hidden_size, config.intermediate_size),
+                nn.GELU(),
+                nn.Dropout(config.dropout_prob),
+                nn.Linear(config.intermediate_size, config.hidden_size),
+                nn.Dropout(config.dropout_prob)
+            )
+
+        self.use_sparse_attention = config.use_sparse_attention
+        self.layer_norm1 = nn.LayerNorm(
+            config.hidden_size, eps=config.layer_norm_eps
+        )
+        self.layer_norm2 = nn.LayerNorm(
+            config.hidden_size, eps=config.layer_norm_eps
+        )
+        self.dropout = nn.Dropout(config.dropout_prob)
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+        attention_mask=None
+    ) -> torch.Tensor:
+
+        # Attention forward
+        if self.use_sparse_attention:
+            attn_out = self.attention(hidden_states, attention_mask)
+        else:
+            attn_out, _ = self.attention(
+                hidden_states, hidden_states, hidden_states
+            )
+
+        hidden_states = self.layer_norm1(
+            hidden_states + self.dropout(attn_out)
+        )
+
+        # FFN forward
+        ffn_out = self.ffn(hidden_states)
+        hidden_states = self.layer_norm2(
+            hidden_states + self.dropout(ffn_out)
+        )
+
+        return hidden_states
         
     def forward(self, hidden_states: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         batch_size, seq_length, hidden_size = hidden_states.shape
@@ -104,29 +166,55 @@ class TokenPooling(nn.Module):
         
         self.pooling_layer = nn.Linear(config.hidden_size * 2, config.hidden_size)
         
-    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
-        batch_size, seq_length, hidden_size = hidden_states.shape
-        
-        # Handle edge case for very short sequences
-        if seq_length < 2:
-            return hidden_states
-        
-        # Simple pooling: combine adjacent tokens
-        if seq_length % 2 == 1:
-            # Pad if odd length
-            padding = torch.zeros(batch_size, 1, hidden_size, device=hidden_states.device)
-            hidden_states = torch.cat([hidden_states, padding], dim=1)
-            seq_length += 1
-        
-        # Reshape and pool
-        pooled_length = seq_length // 2
-        reshaped = hidden_states.view(batch_size, pooled_length, 2, hidden_size)
-        concatenated = reshaped.view(batch_size, pooled_length, 2 * hidden_size)
-        
-        # Apply linear transformation
-        pooled = self.pooling_layer(concatenated)
-        
-        return pooled
+    def forward(
+    self,
+    input_ids: torch.Tensor,
+    attention_mask=None
+):
+    batch_size, seq_length = input_ids.shape
+
+    if seq_length > self.config.max_position_embeddings:
+        input_ids = input_ids[:, :self.config.max_position_embeddings]
+        if attention_mask is not None:
+            attention_mask = attention_mask[
+                :, :self.config.max_position_embeddings
+            ]
+        seq_length = self.config.max_position_embeddings
+
+    position_ids = torch.arange(
+        seq_length, device=input_ids.device
+    ).unsqueeze(0).expand(batch_size, -1)
+
+    token_embeds    = self.token_embeddings(input_ids)
+    position_embeds = self.position_embeddings(position_ids)
+    hidden_states   = token_embeds + position_embeds
+    hidden_states   = self.layer_norm(hidden_states)
+    hidden_states   = self.dropout(hidden_states)
+
+    for layer in self.layers:
+        hidden_states = layer(hidden_states, attention_mask)
+
+    # Token pooling — now actually used when flag is True
+    if self.config.use_token_pooling:
+        hidden_states = self.token_pooling(hidden_states)
+
+    # Global pooling for classification
+    if attention_mask is not None:
+        mask_expanded  = attention_mask.unsqueeze(-1)
+        mask_expanded  = mask_expanded.expand(
+            hidden_states.size()
+        ).float()
+        sum_embeddings = torch.sum(hidden_states * mask_expanded, 1)
+        sum_mask       = torch.clamp(mask_expanded.sum(1), min=1e-9)
+        pooled_output  = sum_embeddings / sum_mask
+    else:
+        pooled_output = hidden_states.mean(dim=1)
+
+    syntactic_logits = self.syntactic_classifier(pooled_output)
+    semantic_logits  = self.semantic_classifier(pooled_output)
+    pragmatic_logits = self.pragmatic_classifier(pooled_output)
+
+    return syntactic_logits, semantic_logits, pragmatic_logits
 
 class MixtureOfExperts(nn.Module):
     """mixture of experts for specialized processing."""
