@@ -166,30 +166,31 @@ class TokenPooling(nn.Module):
         
         self.pooling_layer = nn.Linear(config.hidden_size * 2, config.hidden_size)
         
-    def forward(
-    self,
-    input_ids: torch.Tensor,
-    attention_mask=None
-):
-    batch_size, seq_length = input_ids.shape
+    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        batch_size, seq_length, hidden_size = hidden_states.shape
 
-    if seq_length > self.config.max_position_embeddings:
-        input_ids = input_ids[:, :self.config.max_position_embeddings]
-        if attention_mask is not None:
-            attention_mask = attention_mask[
-                :, :self.config.max_position_embeddings
-            ]
-        seq_length = self.config.max_position_embeddings
+        # Handle edge case for very short sequences
+        if seq_length < 2:
+            return hidden_states
 
-    position_ids = torch.arange(
-        seq_length, device=input_ids.device
-    ).unsqueeze(0).expand(batch_size, -1)
+        # Simple pooling: combine adjacent tokens
+        if seq_length % 2 == 1:
+            # Pad if odd length
+            padding = torch.zeros(batch_size, 1, hidden_size, 
+                                  device=hidden_states.device)
+            hidden_states = torch.cat([hidden_states, padding], dim=1)
+            seq_length += 1
 
-    token_embeds    = self.token_embeddings(input_ids)
-    position_embeds = self.position_embeddings(position_ids)
-    hidden_states   = token_embeds + position_embeds
-    hidden_states   = self.layer_norm(hidden_states)
-    hidden_states   = self.dropout(hidden_states)
+        # Reshape and pool
+        pooled_length = seq_length // 2
+        reshaped      = hidden_states.view(batch_size, pooled_length, 
+                                           2, hidden_size)
+        concatenated  = reshaped.view(batch_size, pooled_length, 
+                                      2 * hidden_size)
+
+        # Apply linear transformation
+        pooled = self.pooling_layer(concatenated)
+        return pooled
 
     for layer in self.layers:
         hidden_states = layer(hidden_states, attention_mask)
